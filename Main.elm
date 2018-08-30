@@ -3,7 +3,7 @@ import Html exposing (Html, button, div, text, select, option)
 import Html.Events exposing (onClick)
 import Html.Attributes exposing (value)
 import Http 
-import Json.Decode as Decode
+import Json.Decode as Decode exposing(string, list)
 import Url.Builder as Url
 
 main =
@@ -53,11 +53,16 @@ view model =
 graphQLUrl : String
 graphQLUrl = "localhost:4000/graphql" 
 
--- teacherSalary : { name: String, averageSalary: String }
--- teacherSalary = { name = "", averageSalary = "" }
+type alias TeacherSalary =
+  { name : String
+  , averageSalary : String
+  }
 
-teacherSalary : String
-teacherSalary = ""
+dataDecoder : Decode.Decoder TeacherSalary
+dataDecoder =
+  Decode.map2 TeacherSalary
+    (Decode.field "name" string)
+    (Decode.field "averageSalary" string)
 
-dataDecoder : Decode.Decoder String
-dataDecoder = Decode.field "data" (Decode.field "teacherSalary" Decode.string)
+postTeacherSalary : Http.Request (List TeacherSalary)
+postTeacherSalary = Http.post graphQLUrl Http.emptyBody (list dataDecoder)
