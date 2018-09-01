@@ -1,53 +1,43 @@
 import Browser
 import Html exposing (Html, button, div, text, select, option)
-import Html.Events exposing (onClick)
+import Html.Events exposing (onClick, onInput)
 import Html.Attributes exposing (value)
 import Http 
 import Json.Decode as Decode exposing(string, list)
 import Url.Builder as Url
-
+import Maybe
 main =
   Browser.sandbox { init = init, update = update, view = view }
 
-names = ["Abington", "Arlington", "Lexington"]
+districts = [ {name = "Abington", code = "10000"}, { name = "Arlington", code = "20000"}]
 
-districtOption name = 
-    option [ value name ] [ text name ]
+districtOption district = 
+    option [ value district.code ] [ text district.name ]
 
 -- MODEL
-
-type alias Model = { incrementValue : Int }
-
+type alias Model = { incrementValue : Int, districtCode: String }
 init : Model
-init = { incrementValue = 0 }
+init = { incrementValue = 0, districtCode = "" }
 
 
 -- UPDATE
 
-type Msg = Increment | Decrement | Reset
+type Msg = UpdateDistrict String
 -- Takes two arguments, msg and model and returns model
 update : Msg -> Model -> Model
 update msg model =
   case msg of
-    Increment ->
-      { model | incrementValue = model.incrementValue + 1 }
-
-    Decrement ->
-      { model | incrementValue = model.incrementValue - 1 }
-    Reset -> 
-      { model | incrementValue = 0 }
+    UpdateDistrict code ->
+      { model | districtCode = code }
 
 -- VIEW
 
 view : Model -> Html Msg
 view model =
   div []
-    [ button [ onClick Decrement ] [ text "-" ]
-    , div [] [ text (String.fromInt model.incrementValue) ]
-    , button [ onClick Increment ] [ text "+" ]
-    , button [ onClick Reset ] [ text "Reset" ]
-    , select []
-        (List.map districtOption (names))
+    [ select [ onInput UpdateDistrict]
+        (List.map districtOption (districts))
+    , div [] [ text model.districtCode ]
     ]
         
 graphQLUrl : String
