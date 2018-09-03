@@ -1,8 +1,8 @@
 import Browser
-import Html exposing (Html, button, div, text, select, option)
+import Html exposing (Html, button, div, text, select, option, ul)
 import Html.Events exposing (onClick, onInput)
 import Html.Attributes exposing (value)
-import Http 
+import Http
 import Json.Decode as Decode exposing(string, list)
 import Url.Builder as Url
 import Maybe
@@ -39,6 +39,8 @@ update msg model =
           )
 
         Err _ ->
+          Debug.log (Debug.toString result)
+          Debug.log "error"
           ( model
           , Cmd.none
           )
@@ -50,6 +52,9 @@ subscriptions model =
 
 -- VIEW
 
+renderSalaries salaryData =  
+    div [ value salaryData.name ] [ text salaryData.averageSalary ]
+
 view : Model -> Html Msg
 view model =
   div []
@@ -57,6 +62,8 @@ view model =
         (List.map districtOption (districts))
     , div [] [ text model.districtCode ]
     , button [ onClick ApplyDistrict ] [ text "Apply" ]
+    , ul []
+     ( List.map renderSalaries (model.salaryData) )
     ]
         
 graphQLUrl : String
@@ -73,10 +80,31 @@ dataDecoder =
     (Decode.field "name" string)
     (Decode.field "averageSalary" string)
 
+
+dataListDecoder : Decode.Decoder (List TeacherSalary)
+dataListDecoder = 
+  Decode.list dataDecoder
+
+salaryQuery : String
+salaryQuery =
+  """
+  { teacherSalaries(codes: [10000, 30000]) { name averageSalary } }
+  """
+
+{-
+    Might be needed for posting
 postTeacherSalary : Http.Request (List TeacherSalary)
 postTeacherSalary = Http.post graphQLUrl Http.emptyBody (list dataDecoder)
+-}
+
+request : Http.Request (List TeacherSalary)
+request = 
+  let 
+    encoded = salaryQuery
+  in 
+    Http.get ("http://localhost:4000/graphql?query=" ++ encoded) dataListDecoder
 
 
 getTeacherSalary : String -> Cmd Msg
 getTeacherSalary code =
-  Http.send FetchTeacherSalary postTeacherSalary
+  Http.send FetchTeacherSalary request
