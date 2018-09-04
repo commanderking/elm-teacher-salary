@@ -4,26 +4,31 @@ import Html.Events exposing (onClick, onInput)
 import Html.Attributes exposing (value)
 import Http
 import Json.Decode as Decode exposing(string, list)
-import Url.Builder as Url
-import Maybe
+
 main =
   Browser.element { init = init, update = update, view = view, subscriptions = subscriptions }
 
-districts = [ {name = "Abington", code = "10000"}, { name = "Arlington", code = "20000"}]
-
-districtOption district = 
-    option [ value district.code ] [ text district.name ]
+districts = [ {name = "Abington", code = "10000"}, { name = "Acushnet", code = "30000"}]
 
 -- MODEL
-type alias SalaryData = { name : String, averageSalary : String }
-type alias Model = { incrementValue : Int, districtCode: String, salaryData: List SalaryData }
+type alias SalaryData = { 
+    name : String, 
+    averageSalary : String }
+type alias Model = { 
+    incrementValue : Int
+    , districtCode: String
+    , salaryData: List SalaryData }
 init : () -> (Model, Cmd Msg)
-init _ = ({ incrementValue = 0, districtCode = "", salaryData = [] }, Cmd.none)
+init _ = ({ incrementValue = 0, districtCode = "10000", salaryData = [] }, getTeacherSalary "10000")
 updateCode model code = { model | districtCode = code }
--- UPDATE
 
-type Msg = UpdateDistrict String | ApplyDistrict | FetchTeacherSalary (Result Http.Error (List SalaryData))
--- Takes two arguments, msg and model and returns model
+
+-- UPDATE
+type Msg = 
+  UpdateDistrict String | 
+  ApplyDistrict | 
+  FetchTeacherSalary (Result Http.Error (List SalaryData))
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
@@ -37,10 +42,7 @@ update msg model =
           ( { model | salaryData = newSalaryData }
           , Cmd.none
           )
-
         Err _ ->
-          Debug.log (Debug.toString result)
-          Debug.log "error"
           ( model
           , Cmd.none
           )
@@ -52,59 +54,41 @@ subscriptions model =
 
 -- VIEW
 
-renderSalaries salaryData =  
-    div [ value salaryData.name ] [ text salaryData.averageSalary ]
+renderSalaryData salaryData =  
+    div [] [ text (salaryData.name ++ ": " ++ salaryData.averageSalary ) ]
+renderDistrictOption district = 
+    option [ value district.code ] [ text district.name ]
+
 
 view : Model -> Html Msg
 view model =
   div []
     [ select [ onInput UpdateDistrict]
-        (List.map districtOption (districts))
+        (List.map renderDistrictOption (districts))
     , div [] [ text model.districtCode ]
     , button [ onClick ApplyDistrict ] [ text "Apply" ]
     , ul []
-     ( List.map renderSalaries (model.salaryData) )
+     ( List.map renderSalaryData (model.salaryData) )
     ]
-        
-graphQLUrl : String
-graphQLUrl = "http://localhost:4000/graphql"
 
-type alias TeacherSalary =
-  { name : String
-  , averageSalary : String
-  }
-
-dataDecoder : Decode.Decoder TeacherSalary
-dataDecoder =
-  Decode.map2 TeacherSalary
+salaryDataDecoder : Decode.Decoder (List SalaryData)
+salaryDataDecoder =
+  Decode.list (Decode.map2 SalaryData
     (Decode.field "name" string)
-    (Decode.field "averageSalary" string)
+    (Decode.field "averageSalary" string))
 
+salaryQuery : String -> String
+salaryQuery code = "{ teacherSalaries(codes: [" ++ code ++ "]) { name averageSalary } }"
 
-dataListDecoder : Decode.Decoder (List TeacherSalary)
-dataListDecoder = 
-  Decode.list dataDecoder
-
-salaryQuery : String
-salaryQuery =
-  """
-  { teacherSalaries(codes: [10000, 30000]) { name averageSalary } }
-  """
-
-{-
-    Might be needed for posting
-postTeacherSalary : Http.Request (List TeacherSalary)
-postTeacherSalary = Http.post graphQLUrl Http.emptyBody (list dataDecoder)
--}
-
-request : Http.Request (List TeacherSalary)
-request = 
+requestSalaryData : String -> Http.Request (List SalaryData)
+requestSalaryData code = 
   let 
-    encoded = salaryQuery
+    teacherSalaryDecoder = Decode.at [ "data", "teacherSalaries" ] <| salaryDataDecoder
   in 
-    Http.get ("http://localhost:4000/graphql?query=" ++ encoded) dataListDecoder
+    -- TODO: Refactor graphql link to common string
+    Http.get ("http://localhost:4000/graphql?query=" ++ (salaryQuery code)) teacherSalaryDecoder
 
 
 getTeacherSalary : String -> Cmd Msg
 getTeacherSalary code =
-  Http.send FetchTeacherSalary request
+  Http.send FetchTeacherSalary (requestSalaryData code)
